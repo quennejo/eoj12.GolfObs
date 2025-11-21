@@ -1,0 +1,29 @@
+# Exclure les fichiers système et temporaires
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+*.bak
+*.tmp
+.DS_Store
+.env*
+env312/
+backup/
+# Exclure les fichiers de configuration locaux
+*.local
+*.log
+*.sqlite3
+# Exclure les fichiers de modèles et de données volumineux
+*.pt
+*.h5
+*.ckpt
+*.weights
+# Exclure les dossiers de l'environnement virtuel
+venv/
+ENV/
+env312
+.env/
+bin/
+share/
