@@ -43,8 +43,13 @@ class Replay:
         self.client = ReqClient(host=host, port=port, password=password)
         
         # Cacher les fichiers existants dans le dossier surveillé
-        self.cached_files = set(glob.glob(os.path.join(self.watch_dir, "*.mp4")))
+        # EXCLURE les fichiers _AI.mp4 qui sont générés par l'analyse
+        all_mp4_files = set(glob.glob(os.path.join(self.watch_dir, "*.mp4")))
+        self.cached_files = {f for f in all_mp4_files if not f.endswith("_AI.mp4")}
         self.already_seen = self.cached_files.copy()
+        
+        # Flag pour éviter les replays concurrents
+        self.replay_in_progress = False
     
     def analyze_video(self, video_path):
         """
@@ -87,6 +92,14 @@ class Replay:
             video_path: Chemin vers la vidéo de replay
         """
         try:
+            # Vérifier si un replay est déjà en cours
+            if self.replay_in_progress:
+                print(f"⚠️  Un replay est déjà en cours, ignorer cette demande", flush=True)
+                return
+            
+            # Marquer le replay comme en cours
+            self.replay_in_progress = True
+            
             print(f"\n🎬 Déclenchement du replay : {os.path.basename(video_path)}", flush=True)
             
             # Analyser la vidéo si demandé
@@ -142,6 +155,9 @@ class Replay:
             print(f"❌ Erreur lors du replay : {e}", flush=True)
             import traceback
             traceback.print_exc()
+        finally:
+            # Toujours libérer le flag, même en cas d'erreur
+            self.replay_in_progress = False
     
     def on_swing_detected(self, timestamp):
         """
@@ -151,7 +167,14 @@ class Replay:
         Args:
             timestamp: Timestamp de la détection du swing
         """
-        print(f"\n🎯 Swing détecté ! Recherche de la vidéo...", flush=True)
+        print(f"\n🎯 Swing détecté ! (timestamp: {timestamp})", flush=True)
+        
+        # Si un replay est déjà en cours, ignorer cette détection
+        if self.replay_in_progress:
+            print(f"⚠️  Un replay est déjà en cours, cette détection sera ignorée", flush=True)
+            return
+        
+        print(f"🔍 Recherche de la vidéo...", flush=True)
         
         # Attendre que le fichier soit complètement écrit par OBS
         # On va essayer plusieurs fois avec un délai croissant
@@ -169,6 +192,12 @@ class Replay:
                 print(f"\n{'='*60}", flush=True)
                 print(f"📹 Nouvelle vidéo détectée : {os.path.basename(new_video)}", flush=True)
                 print(f"{'='*60}\n", flush=True)
+                
+                # Marquer la vidéo comme vue IMMÉDIATEMENT
+                self.already_seen.add(new_video)
+                print(f"✅ Vidéo marquée comme vue avant démarrage du replay", flush=True)
+                
+                # Déclencher le replay (qui vérifiera aussi le flag replay_in_progress)
                 self.trigger_replay(new_video)
                 return  # Succès, on sort
         
@@ -182,6 +211,7 @@ class Replay:
         """
         Vérifie s'il y a une nouvelle vidéo dans le dossier surveillé.
         Retourne le fichier le plus récent parmi les nouveaux fichiers.
+        EXCLUT les fichiers *_AI.mp4 qui sont générés par l'analyse.
         
         Returns:
             str ou None: Chemin de la nouvelle vidéo ou None
@@ -191,23 +221,24 @@ class Replay:
             print(f"⚠️  Le dossier surveillé n'existe pas : {self.watch_dir}", flush=True)
             return None
         
-        # Obtenir tous les fichiers .mp4 actuels
-        current_files = set(glob.glob(os.path.join(self.watch_dir, "*.mp4")))
+        # Obtenir tous les fichiers .mp4 actuels (EXCLURE les fichiers _AI.mp4)
+        all_mp4_files = set(glob.glob(os.path.join(self.watch_dir, "*.mp4")))
+        current_files = {f for f in all_mp4_files if not f.endswith("_AI.mp4")}
         
         # Trouver les nouveaux fichiers (non encore vus)
         new_files = current_files - self.already_seen
         
-        print(f"🔍 Vérification : {len(current_files)} fichiers totaux, {len(self.already_seen)} déjà vus, {len(new_files)} nouveaux", flush=True)
+        print(f"🔍 Vérification : {len(current_files)} fichiers totaux (excl. _AI), {len(self.already_seen)} déjà vus, {len(new_files)} nouveaux", flush=True)
         
         if new_files:
             # Trouver le fichier le plus récent parmi les nouveaux
             latest = max(new_files, key=os.path.getmtime)
             
-            # Marquer tous les nouveaux fichiers comme vus
-            self.already_seen.update(new_files)
-            
             print(f"🆕 Nouvelle vidéo trouvée: {os.path.basename(latest)}", flush=True)
             print(f"   📅 Date de modification : {time.ctime(os.path.getmtime(latest))}", flush=True)
+            
+            # NE PAS marquer comme vu ici - ce sera fait dans on_swing_detected()
+            # pour éviter les doubles replays
             return latest
         
         return None

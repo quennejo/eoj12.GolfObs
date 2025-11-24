@@ -98,8 +98,9 @@ class GolfSwingAnalyzer:
         self.cap = cv2.VideoCapture(self.video_path)
         if not self.cap.isOpened():
             raise ValueError(f"Impossible d'ouvrir la vidéo: {self.video_path}")
-        
+        ## Récupération du FPS  
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+        ## Récupération des dimensions de la vidéo
         self.width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
@@ -128,13 +129,16 @@ class GolfSwingAnalyzer:
         Returns:
             Tuple (x, y) du centre des mains
         """
+        # Récupération des positions des poignets
         left_wrist = landmarks[self.mp_pose.PoseLandmark.LEFT_WRIST]
         right_wrist = landmarks[self.mp_pose.PoseLandmark.RIGHT_WRIST]
         
+        #Calcul des positions en pixels
         left_hand = (int(left_wrist.x * self.width), int(left_wrist.y * self.height))
         right_hand = (int(right_wrist.x * self.width), int(right_wrist.y * self.height))
         
         return (
+            #left_hand  
             int((left_hand[0] + right_hand[0]) / 2),
             int((left_hand[1] + right_hand[1]) / 2)
         )
@@ -224,12 +228,16 @@ class GolfSwingAnalyzer:
         
         # Calcul des positions du club
         club_bottom = (x1, y2 + 40)
-        club_start = (
-            hands_mid[0] + 450,
-            (hands_mid[1] + 40) - 450
-        )
-        club_start = (club_start[0], club_start[1] - 20)
-        
+        club_start = (hands_mid[0],(hands_mid[1] ))
+        #club_start = (club_start[0], club_start[1] - 20)
+       # lineExtention = 450
+        #club_start= (x2-20,y1)
+        lineExtentionX = int((club_start[0]-x1 ) * 1.5)
+        lineExtentionY = int((y2 -club_start[1]) * 1.5)
+ 
+        #extend the line
+        club_start= (club_start[0]+lineExtentionX),(club_start[1]-lineExtentionY)
+             
         self.club_line = (club_start, club_bottom)
         
         # Dessiner le rectangle de détection
@@ -373,17 +381,20 @@ if __name__ == "__main__":
     import sys
     
     # Configuration par défaut
-    DEFAULT_VIDEO = "/Users/joequenneville/Movies/OBS/Replay 2025-11-10 22-31-29.mp4"
+    #DEFAULT_VIDEO = "/Users/joequenneville/Movies/OBS/Replay 2025-11-10 22-31-29.mp4"
+    #DEFAULT_VIDEO = "/Users/joequenneville/Movies/OBS/Replay 2025-11-17 20-48-39.mp4"
+    DEFAULT_VIDEO = "/Users/joequenneville/Movies/OBS/Replay 2025-11-17 20-38-55.mp4"
+
     
     # Utiliser l'argument en ligne de commande ou la valeur par défaut
     video_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_VIDEO
     
     # Analyse avec context manager
-    try:
-        with GolfSwingAnalyzer(video_path, max_frames=300) as analyzer:
-            output_path = analyzer.run(show_preview=True)
-            print(f"\n🎉 Analyse terminée avec succès !")
-            print(f"📂 Fichier de sortie : {output_path}")
-    except Exception as e:
-        print(f"\n❌ Erreur lors de l'analyse : {e}")
-        sys.exit(1)
+    #try:
+    with GolfSwingAnalyzer(video_path, max_frames=300) as analyzer:
+        output_path = analyzer.run(show_preview=True)
+        print(f"\n🎉 Analyse terminée avec succès !")
+        print(f"📂 Fichier de sortie : {output_path}")
+   # except Exception as e:
+   #     print(f"\n❌ Erreur lors de l'analyse : {e}")
+   #     sys.exit(1)
